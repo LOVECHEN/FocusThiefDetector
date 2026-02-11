@@ -1,17 +1,12 @@
 import SwiftUI
-import AppKit
 
 /// 主界面视图
 struct ContentView: View {
     @ObservedObject var monitor: FocusMonitor
-    @State private var isExpanded = true
     
     var body: some View {
         VStack(spacing: 0) {
-            // 标题栏
             headerView
-            
-            // 事件列表
             eventListView
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -22,7 +17,8 @@ struct ContentView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
     
-    /// 标题栏视图
+    // MARK: - 标题栏
+    
     private var headerView: some View {
         HStack {
             Image(systemName: "eye.fill")
@@ -33,19 +29,16 @@ struct ContentView: View {
             
             Spacer()
             
-            // 当前应用指示
             Text(monitor.currentApp)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .frame(maxWidth: 80)
             
-            // 事件计数
-            Text("\(monitor.events.count)/50")
+            Text("\(monitor.events.count)/\(Constants.maxEvents)")
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(.tertiary)
             
-            // 清空按钮
             Button(action: { monitor.clearHistory() }) {
                 Image(systemName: "trash")
                     .font(.system(size: 11))
@@ -59,7 +52,8 @@ struct ContentView: View {
         .background(Color.primary.opacity(0.05))
     }
     
-    /// 事件列表视图
+    // MARK: - 事件列表
+    
     private var eventListView: some View {
         Group {
             if monitor.events.isEmpty {
@@ -77,7 +71,8 @@ struct ContentView: View {
         }
     }
     
-    /// 空状态视图
+    // MARK: - 空状态
+    
     private var emptyStateView: some View {
         VStack(spacing: 8) {
             Image(systemName: "sparkles")
@@ -89,61 +84,6 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-/// 单条事件行视图
-struct EventRowView: View {
-    let event: FocusEvent
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            // 时间戳
-            Text(event.formattedTime)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.secondary)
-            
-            // 应用图标（尝试从系统获取真实图标）
-            appIconView
-            
-            // 应用名称
-            Text(event.appName)
-                .font(.system(size: 12))
-                .lineLimit(1)
-                .foregroundStyle(event.isSuspicious ? .red : .primary)
-            
-            Spacer()
-            
-            // 如果是可疑切换，显示时间间隔
-            if event.isSuspicious, let interval = event.timeSinceLast {
-                Text(String(format: "%.1fs", interval))
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.red.opacity(0.8))
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
-                    .background(Color.red.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
-        .background(event.isSuspicious ? Color.red.opacity(0.05) : Color.clear)
-    }
-    
-    /// 应用图标视图：优先显示真实图标，回退到 emoji
-    @ViewBuilder
-    private var appIconView: some View {
-        if let bid = event.bundleIdentifier,
-           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bid),
-           let icon = NSWorkspace.shared.icon(forFile: appURL.path) as NSImage? {
-            Image(nsImage: icon)
-                .resizable()
-                .frame(width: 16, height: 16)
-                .clipShape(RoundedRectangle(cornerRadius: 3))
-        } else {
-            Text(event.iconName)
-                .font(.system(size: 10))
-        }
     }
 }
 

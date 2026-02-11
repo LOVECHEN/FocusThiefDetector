@@ -3,11 +3,11 @@ import AppKit
 import Combine
 import os.log
 
-/// 焦点监控器 - 核心逻辑
-/// 监听系统应用焦点切换事件并记录历史
+/// 焦点监控器 - 核心业务逻辑
+/// 监听系统应用焦点切换事件并维护历史记录
 @MainActor
 class FocusMonitor: ObservableObject {
-    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "FocusThiefDetector", category: "Monitor")
+    private static let logger = Logger(subsystem: Constants.logSubsystem, category: "Monitor")
     
     /// 焦点事件历史记录（最新的在前面）
     @Published private(set) var events: [FocusEvent] = []
@@ -18,11 +18,8 @@ class FocusMonitor: ObservableObject {
     /// 是否正在监控
     @Published private(set) var isMonitoring: Bool = false
     
-    /// 最大保留事件数量
-    private let maxEvents = 50
-    
-    /// 可疑焦点切换的时间阈值（秒），可通过托盘菜单调整
-    @Published var suspiciousThreshold: TimeInterval = 1.0
+    /// 可疑焦点切换的时间阈值（秒）
+    @Published var suspiciousThreshold: TimeInterval = Constants.defaultSuspiciousThreshold
     
     /// 自身 bundleIdentifier，用于过滤
     private let selfBundleID = Bundle.main.bundleIdentifier
@@ -34,7 +31,6 @@ class FocusMonitor: ObservableObject {
     private var observer: NSObjectProtocol?
     
     init() {
-        // 启动时获取当前激活的应用
         if let app = NSWorkspace.shared.frontmostApplication {
             currentApp = app.localizedName ?? "未知"
         }
@@ -73,24 +69,22 @@ class FocusMonitor: ObservableObject {
         events.removeAll()
     }
     
-    /// 处理应用激活事件
+    // MARK: - Private
+    
     private func handleAppActivation(_ notification: Notification) {
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
             return
         }
         
-        // 过滤自身焦点切换，避免噪声
+        // 过滤自身
         if let bid = app.bundleIdentifier, bid == selfBundleID {
             return
         }
         
         let appName = app.localizedName ?? "未知应用"
         let now = Date()
-        
-        // 计算距离上次切换的时间间隔
         let timeSinceLast = lastSwitchTime.map { now.timeIntervalSince($0) }
         
-        // 创建焦点事件
         let event = FocusEvent(
             timestamp: now,
             appName: appName,
@@ -100,19 +94,14 @@ class FocusMonitor: ObservableObject {
             suspiciousThreshold: suspiciousThreshold
         )
         
-        // 更新状态
         currentApp = appName
         lastSwitchTime = now
         
-        // 插入到列表开头
         events.insert(event, at: 0)
-        
-        // 限制列表大小
-        if events.count > maxEvents {
+        if events.count > Constants.maxEvents {
             events.removeLast()
         }
         
-        // 如果是可疑切换，打印警告
         // 可疑切换：日志 + 声音提醒
         if event.isSuspicious {
             Self.logger.warning("⚠️ 可疑焦点抢夺: \(appName) (间隔: \(String(format: "%.2f", timeSinceLast ?? 0))s)")
