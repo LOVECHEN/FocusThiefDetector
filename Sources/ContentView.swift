@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// 主界面视图
 struct ContentView: View {
@@ -38,6 +39,11 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .frame(maxWidth: 80)
+            
+            // 事件计数
+            Text("\(monitor.events.count)/50")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.tertiary)
             
             // 清空按钮
             Button(action: { monitor.clearHistory() }) {
@@ -97,9 +103,8 @@ struct EventRowView: View {
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.secondary)
             
-            // 状态图标
-            Text(event.iconName)
-                .font(.system(size: 10))
+            // 应用图标（尝试从系统获取真实图标）
+            appIconView
             
             // 应用名称
             Text(event.appName)
@@ -123,6 +128,22 @@ struct EventRowView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
         .background(event.isSuspicious ? Color.red.opacity(0.05) : Color.clear)
+    }
+    
+    /// 应用图标视图：优先显示真实图标，回退到 emoji
+    @ViewBuilder
+    private var appIconView: some View {
+        if let bid = event.bundleIdentifier,
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bid),
+           let icon = NSWorkspace.shared.icon(forFile: appURL.path) as NSImage? {
+            Image(nsImage: icon)
+                .resizable()
+                .frame(width: 16, height: 16)
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+        } else {
+            Text(event.iconName)
+                .font(.system(size: 10))
+        }
     }
 }
 

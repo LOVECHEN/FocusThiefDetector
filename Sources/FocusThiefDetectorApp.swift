@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import os.log
 
 /// 焦点追踪器应用入口
 @main
@@ -15,6 +16,8 @@ struct FocusThiefDetectorApp: App {
 
 /// 应用代理 - 托盘 + 悬浮窗口
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "FocusThiefDetector", category: "App")
+    
     var floatingWindow: NSWindow!
     var statusItem: NSStatusItem!
     var monitor: FocusMonitor!
@@ -40,7 +43,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 检查辅助功能权限
         checkAccessibilityPermission()
         
-        print("🚀 焦点追踪器已启动")
+        Self.logger.info("🚀 焦点追踪器已启动")
     }
     
     /// 设置托盘图标
@@ -49,8 +52,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "eye.circle.fill", accessibilityDescription: "焦点追踪器")
-            button.action = #selector(statusBarClicked)
-            button.target = self
         }
         
         // 创建菜单
@@ -64,9 +65,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = menu
     }
     
-    @objc func statusBarClicked() {
-        toggleWindow()
-    }
     
     @objc func toggleWindow() {
         if floatingWindow.isVisible {
@@ -93,9 +91,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let trusted = AXIsProcessTrustedWithOptions(options as CFDictionary)
         
         if !trusted {
-            print("⚠️ 需要辅助功能权限才能完整监控焦点切换")
+            Self.logger.warning("⚠️ 需要辅助功能权限才能完整监控焦点切换")
         } else {
-            print("✅ 辅助功能权限已获取")
+            Self.logger.info("✅ 辅助功能权限已获取")
         }
     }
     
@@ -131,6 +129,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         floatingWindow.minSize = NSSize(width: windowWidth, height: 150)
         floatingWindow.maxSize = NSSize(width: windowWidth, height: 800)
         
+        // 窗口位置持久化：重启后自动恢复上次位置
+        floatingWindow.setFrameAutosaveName("FocusThiefDetectorMainWindow")
+        
         // 设置内容视图
         floatingWindow.contentView = NSHostingView(rootView: contentView)
         
@@ -141,7 +142,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         floatingWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         
-        print("📍 悬浮窗口已创建，尺寸固定: \(Int(windowWidth))x\(Int(windowHeight))")
+        Self.logger.info("📍 悬浮窗口已创建，尺寸: \(Int(windowWidth))x\(Int(windowHeight))")
     }
 }
 

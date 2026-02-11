@@ -1,11 +1,14 @@
 import Foundation
 import AppKit
 import Combine
+import os.log
 
 /// 焦点监控器 - 核心逻辑
 /// 监听系统应用焦点切换事件并记录历史
 @MainActor
 class FocusMonitor: ObservableObject {
+    private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "FocusThiefDetector", category: "Monitor")
+    
     /// 焦点事件历史记录（最新的在前面）
     @Published private(set) var events: [FocusEvent] = []
     
@@ -17,6 +20,12 @@ class FocusMonitor: ObservableObject {
     
     /// 最大保留事件数量
     private let maxEvents = 50
+    
+    /// 可疑焦点切换的时间阈值（秒），可通过托盘菜单调整
+    @Published var suspiciousThreshold: TimeInterval = 1.0
+    
+    /// 自身 bundleIdentifier，用于过滤
+    private let selfBundleID = Bundle.main.bundleIdentifier
     
     /// 上一次焦点切换的时间
     private var lastSwitchTime: Date?
@@ -46,7 +55,7 @@ class FocusMonitor: ObservableObject {
         }
         
         isMonitoring = true
-        print("🔍 焦点监控已启动")
+        Self.logger.info("🔍 焦点监控已启动")
     }
     
     /// 停止监控
@@ -56,7 +65,7 @@ class FocusMonitor: ObservableObject {
             self.observer = nil
         }
         isMonitoring = false
-        print("⏹️ 焦点监控已停止")
+        Self.logger.info("⏹️ 焦点监控已停止")
     }
     
     /// 清空历史记录
@@ -67,6 +76,11 @@ class FocusMonitor: ObservableObject {
     /// 处理应用激活事件
     private func handleAppActivation(_ notification: Notification) {
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+            return
+        }
+        
+        // 过滤自身焦点切换，避免噪声
+        if let bid = app.bundleIdentifier, bid == selfBundleID {
             return
         }
         
@@ -82,7 +96,8 @@ class FocusMonitor: ObservableObject {
             appName: appName,
             bundleIdentifier: app.bundleIdentifier,
             processIdentifier: app.processIdentifier,
-            timeSinceLast: timeSinceLast
+            timeSinceLast: timeSinceLast,
+            suspiciousThreshold: suspiciousThreshold
         )
         
         // 更新状态
@@ -98,8 +113,10 @@ class FocusMonitor: ObservableObject {
         }
         
         // 如果是可疑切换，打印警告
+        // 可疑切换：日志 + 声音提醒
         if event.isSuspicious {
-            print("⚠️ 可疑焦点抢夺: \(appName) (间隔: \(String(format: "%.2f", timeSinceLast ?? 0))s)")
+            Self.logger.warning("⚠️ 可疑焦点抢夺: \(appName) (间隔: \(String(format: "%.2f", timeSinceLast ?? 0))s)")
+            NSSound.beep()
         }
     }
     
